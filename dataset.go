@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	//"runtime"
+	"sync"
+	"time"
 )
 
 type User struct {
@@ -41,7 +44,7 @@ const (
 	USER_PREFIX          = "test"
 	USER_PASSWORD        = "test123"
 	USER_EMAIL           = "@test.com"
-	SPACE_PREFIX         = "1000space"
+	SPACE_PREFIX         = "space"
 	NB_USERS             = 1000
 	NB_SPACES            = 2000
 	NB_SPACES_ACTIVITIES = 10
@@ -75,27 +78,60 @@ func createUsers(h string, u string, p string) {
 	}
 }
 
-/*
-curl -uroot:gtn -H'Content-Type: application/json' -X POST http://localhost:8080/rest/private/v1/social/spaces -d '{"displayName":"space1", "description":"space1", "visibility":"public", "subscription":"open"}'
-*/
-func createSpaces(h string, u string, p string) {
-	for i := 0; i < NB_SPACES; i++ {
-		name := fmt.Sprintf("%s%d", SPACE_PREFIX, i)
+func createSpace(wg *sync.WaitGroup, c <- chan int, h string) {
+	// TODO cleary exit
+	for {
+		t0:= time.Now()
+		id := <- c
+
+		name := fmt.Sprintf("%s%d", SPACE_PREFIX, id)
 		newSpace := Space{DisplayName: name, Description: name, Visibility: "public", Subscription: "open"}
 		json, _ := json.Marshal(newSpace)
 
 		req, _ := http.NewRequest("POST", fmt.Sprintf("%s%s", h, SPACES_URI), bytes.NewBuffer(json))
 		req.Header.Set("Content-Type", "application/json")
-		fmt.Print("Space ", name, " : ")
 
 		res, _ := client.Do(req)
 
 		req.Body.Close()
 		res.Body.Close()
 
-		fmt.Println(res.Status)
+		t1 := time.Now()
 
+		fmt.Println("Space ", name, " : " + res.Status, " in ", t1.Sub(t0))
+
+		wg.Done()
 	}
+}
+
+/*
+curl -uroot:gtn -H'Content-Type: application/json' -X POST http://localhost:8080/rest/private/v1/social/spaces -d '{"displayName":"space1", "description":"space1", "visibility":"public", "subscription":"open"}'
+*/
+func createSpaces(h string, u string, p string) {
+
+	var wg sync.WaitGroup
+
+	sc := make(chan int)
+
+	////-------------
+	// Create any go routines here
+	// For the moment it's not possible
+	// to create more than one space at a time
+	// due to https://jira.exoplatform.org/browse/SOC-5697
+	go createSpace(&wg, sc, h)
+
+	t0:= time.Now()
+
+	for i := 0; i < NB_SPACES; i++ {
+		wg.Add(1)
+		sc <- i
+	}
+	fmt.Println("Waiting for the threads to finish")
+	wg.Wait()
+	t1 := time.Now()
+	fmt.Println("All thread done")
+	fmt.Println("Spaces created in ", t1.Sub(t0))
+
 }
 
 /*
@@ -105,7 +141,7 @@ func createSpacesActivities(h string, u string, p string) {
 
 	for i := 1; i <= NB_SPACES_ACTIVITIES; i++ {
 		for s := 1; s <= NB_SPACES; s++ {
-			title := fmt.Sprintf("%s%d - Activity %d", SPACE_PREFIX, s, i)
+			title := fmt.Sprintf("%s%d - Activity %d - with a long text as I have tell something", SPACE_PREFIX, s, i)
 
 			a := Activity{Title: title}
 
@@ -167,7 +203,7 @@ func main() {
 	getSession(host, user, password)
 
 	//	createUsers(host, user, password)
-	//createSpaces(host, user, password)
-	createSpacesActivities(host, user, password)
+	createSpaces(host, user, password)
+	//createSpacesActivities(host, user, password)
 
 }
