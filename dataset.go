@@ -37,17 +37,18 @@ type Activity struct {
 }
 
 const (
-	SESSION_URI          = "%s/rest/private/"
-	USERS_URI            = "/rest/private/v1/social/users"
-	SPACES_URI           = "/rest/private/v1/social/spaces"
-	SPACE_ACTIVITIES_URI = "%s/rest/private/v1/social/spaces/%d/activities"
-	USER_PREFIX          = "test"
-	USER_PASSWORD        = "test123"
-	USER_EMAIL           = "@test.com"
-	SPACE_PREFIX         = "space"
-	NB_USERS             = 1000
-	NB_SPACES            = 2000
-	NB_SPACES_ACTIVITIES = 10
+	SESSION_URI           = "%s/rest/private/"
+	USERS_URI             = "/rest/private/v1/social/users"
+	SPACES_URI            = "/rest/private/v1/social/spaces"
+	SPACE_ACTIVITIES_URI  = "%s/rest/private/v1/social/spaces/%d/activities"
+	USER_PREFIX           = "test"
+	USER_PASSWORD         = "test123"
+	USER_EMAIL            = "@test.com"
+	SPACE_PREFIX          = "space"
+	NB_USERS              = 1000
+	NB_SPACES             = 2000
+	NB_SPACES_ACTIVITIES  = 10
+	SPACE_ACTIVITY_LENGTH = 200
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890 !@#$%^&*()_+-=[]\\{}|;':\",./?"
@@ -65,34 +66,66 @@ func usage(arguments []string) {
 	os.Exit(1)
 }
 
-func createUsers(h string, u string, p string) {
-	for i := 0; i < NB_USERS; i++ {
-		name := fmt.Sprintf("%s%d", USER_PREFIX, i)
+func createUser(wg *sync.WaitGroup, c <-chan string, h string) {
+	for {
+		name := <- c
+
+		t0 := time.Now()
+
 		newUser := User{Username: name, Password: USER_PASSWORD, Email: fmt.Sprintf("%s%s", name, USER_EMAIL), Firstname: name, Lastname: name}
 		json, _ := json.Marshal(newUser)
-		// fmt.Println(string(json))
 
 		req, _ := http.NewRequest("POST", fmt.Sprintf("%s%s", h, USERS_URI), bytes.NewBuffer(json))
 		req.Header.Set("Content-Type", "application/json")
-		fmt.Print("User ", name, " : ")
 
-		res, err := client.Do(req)
-		if err != nil {
-			fmt.Println("Error : ", err)
-		} else {
-			fmt.Println(res.Status)
-		}
+		res, _ := client.Do(req)
 
 		req.Body.Close()
 		res.Body.Close()
+
+		t1 := time.Now()
+
+		fmt.Println("User ", name, " : "+res.Status, " in ", t1.Sub(t0))
+
+		wg.Done()
 	}
 }
 
-func createSpace(wg *sync.WaitGroup, c <- chan int, h string) {
+func createUsers(h string) {
+	var wg sync.WaitGroup
+
+	c := make(chan string)
+
+	////-------------
+	// Create any go routines here
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+
+	t0 := time.Now()
+
+	for i := 0; i < NB_USERS; i++ {
+		wg.Add(1)
+
+		name := fmt.Sprintf("%s%d", USER_PREFIX, i)
+		c <- name
+	}
+	fmt.Println("Waiting for the threads to finish")
+	wg.Wait()
+	t1 := time.Now()
+	fmt.Println("All thread done")
+	fmt.Println("Users created in ", t1.Sub(t0))
+
+}
+
+func createSpace(wg *sync.WaitGroup, c <-chan int, h string) {
 	// TODO cleary exit
 	for {
-		t0:= time.Now()
-		id := <- c
+		t0 := time.Now()
+		id := <-c
 
 		name := fmt.Sprintf("%s%d", SPACE_PREFIX, id)
 		newSpace := Space{DisplayName: name, Description: name, Visibility: "public", Subscription: "open"}
@@ -108,7 +141,7 @@ func createSpace(wg *sync.WaitGroup, c <- chan int, h string) {
 
 		t1 := time.Now()
 
-		fmt.Println("Space ", name, " : " + res.Status, " in ", t1.Sub(t0))
+		fmt.Println("Space ", name, " : "+res.Status, " in ", t1.Sub(t0))
 
 		wg.Done()
 	}
@@ -130,7 +163,7 @@ func createSpaces(h string, u string, p string) {
 	// due to https://jira.exoplatform.org/browse/SOC-5697
 	go createSpace(&wg, sc, h)
 
-	t0:= time.Now()
+	t0 := time.Now()
 
 	for i := 0; i < NB_SPACES; i++ {
 		wg.Add(1)
@@ -243,8 +276,9 @@ func main() {
 
 	getSession(host, user, password)
 
-	//	createUsers(host, user, password)
-	createSpaces(host, user, password)
+	createUsers(host)
+	//createSpaces(host, user, password)
 	//createSpacesActivities(host, user, password)
+	//createSpacesActivitiy(host, 1, "<script language=\"javascript\">alert(\"test\")</script>test")
 
 }
