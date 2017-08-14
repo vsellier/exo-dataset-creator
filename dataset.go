@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	//"runtime"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -49,6 +49,16 @@ const (
 	NB_SPACES            = 2000
 	NB_SPACES_ACTIVITIES = 10
 )
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890 !@#$%^&*()_+-=[]\\{}|;':\",./?"
+
+func RandStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
 
 func usage(arguments []string) {
 	fmt.Println(fmt.Sprintf("%s <base url> <user> <password>", arguments[0]))
@@ -138,14 +148,16 @@ func createSpaces(h string, u string, p string) {
  * Create NB_ACTIVITIES on each space
  */
 func createSpacesActivities(h string, u string, p string) {
+	t0 := time.Now()
 
 	for i := 1; i <= NB_SPACES_ACTIVITIES; i++ {
 		for s := 1; s <= NB_SPACES; s++ {
-			title := fmt.Sprintf("%s%d - Activity %d - with a long text as I have tell something", SPACE_PREFIX, s, i)
+			ta0 := time.Now()
+			title := RandStringBytes(SPACE_ACTIVITY_LENGTH)
 
 			a := Activity{Title: title}
 
-			fmt.Print(fmt.Sprintf("Creating activity %s ...", title))
+			fmt.Print(fmt.Sprintf("Creating activity spaceId=%d actitivyCount=%d ...", s, i))
 
 			json, _ := json.Marshal(a)
 
@@ -155,13 +167,42 @@ func createSpacesActivities(h string, u string, p string) {
 			req.Header.Set("Content-Type", "application/json")
 
 			res, _ := client.Do(req)
-			fmt.Println(res.Status)
+			fmt.Print(res.Status)
 
 			req.Body.Close()
 			res.Body.Close()
 
+			ta1 := time.Now()
+			fmt.Println(" in ", ta1.Sub(ta0))
+
 		}
 	}
+	t1 := time.Now()
+	fmt.Println("Activities created in ", t1.Sub(t0))
+}
+
+func createSpacesActivitiy(h string, id int, content string) {
+	ta0 := time.Now()
+
+	a := Activity{Title: content}
+
+	fmt.Print(fmt.Sprintf("Creating activity spaceId=%d ...", id))
+
+	json, _ := json.Marshal(a)
+
+	req, _ := http.NewRequest("POST", fmt.Sprintf(SPACE_ACTIVITIES_URI, h, id), bytes.NewBuffer(json))
+
+	req.Close = true
+	req.Header.Set("Content-Type", "application/json")
+
+	res, _ := client.Do(req)
+	fmt.Print(res.Status)
+
+	req.Body.Close()
+	res.Body.Close()
+
+	ta1 := time.Now()
+	fmt.Println(" in ", ta1.Sub(ta0))
 }
 
 func getSession(h string, u string, p string) {
