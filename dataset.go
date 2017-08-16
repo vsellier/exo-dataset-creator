@@ -36,17 +36,23 @@ type Activity struct {
 	Title string `json:"title"`
 }
 
+type SpaceMembership struct {
+	User  string `json:"user"`
+	Space string `json:"space"`
+}
+
 const (
 	SESSION_URI           = "%s/rest/private/"
 	USERS_URI             = "/rest/private/v1/social/users"
 	SPACES_URI            = "/rest/private/v1/social/spaces"
 	SPACE_ACTIVITIES_URI  = "%s/rest/private/v1/social/spaces/%d/activities"
+	SPACE_MEMBERSHIP_URL  = "%s/rest/private/v1/social/spacesMemberships"
 	USER_PREFIX           = "test"
 	USER_PASSWORD         = "test123"
 	USER_EMAIL            = "@test.com"
 	SPACE_PREFIX          = "space"
-	NB_USERS              = 1000
-	NB_SPACES             = 2000
+	NB_USERS              = 50
+	NB_SPACES             = 1
 	NB_SPACES_ACTIVITIES  = 10
 	SPACE_ACTIVITY_LENGTH = 200
 )
@@ -68,7 +74,7 @@ func usage(arguments []string) {
 
 func createUser(wg *sync.WaitGroup, c <-chan string, h string) {
 	for {
-		name := <- c
+		name := <-c
 
 		t0 := time.Now()
 
@@ -118,6 +124,64 @@ func createUsers(h string) {
 	t1 := time.Now()
 	fmt.Println("All thread done")
 	fmt.Println("Users created in ", t1.Sub(t0))
+
+}
+
+func addUserToSpace(thread int, h string, space string, user string) {
+	t0 := time.Now()
+	membership := SpaceMembership{User: user, Space: space}
+	json, _ := json.Marshal(membership)
+
+	req, _ := http.NewRequest("POST", fmt.Sprintf(SPACE_MEMBERSHIP_URL, h), bytes.NewBuffer(json))
+	req.Header.Set("Content-Type", "application/json")
+
+	res, _ := client.Do(req)
+
+	req.Body.Close()
+	res.Body.Close()
+
+	t1 := time.Now()
+
+	fmt.Println("[",thread,"] Add user", user, "to space", space, "in", t1.Sub(t0), res.Status)
+}
+
+func addUsersToSpaces(h string) {
+	function := func(id int, wg *sync.WaitGroup, c <-chan *SpaceMembership) {
+		for {
+			m := <-c
+
+			addUserToSpace(id, h, m.Space, m.User)
+
+			wg.Done()
+		}
+	}
+
+	t0 := time.Now()
+
+	var wg sync.WaitGroup
+	c := make(chan *SpaceMembership)
+
+	for id := 0; id < 5; id++ {
+		go function(id, &wg, c)
+	}
+
+	for sid := 0; sid < NB_SPACES; sid++ {
+		for u := 0; u < NB_USERS; u++ {
+			u := fmt.Sprintf("%s%d", USER_PREFIX, u)
+			s := fmt.Sprintf("%s%d", SPACE_PREFIX, sid)
+			m := SpaceMembership{User: u, Space: s}
+
+			wg.Add(1)
+
+			c <- &m
+		}
+	}
+
+	fmt.Println("Waiting for the threads to finish")
+	wg.Wait()
+	t1 := time.Now()
+	fmt.Println("All thread done")
+	fmt.Println("User attacted to spaces in ", t1.Sub(t0))
 
 }
 
@@ -247,7 +311,7 @@ func getSession(h string, u string, p string) {
 	res, _ := client.Do(req)
 	defer res.Body.Close()
 
-	fmt.Println(client.Jar)
+	//fmt.Println(client.Jar)
 
 	fmt.Println("Session created " + res.Status)
 }
@@ -277,8 +341,6 @@ func main() {
 	getSession(host, user, password)
 
 	createUsers(host)
-	//createSpaces(host, user, password)
-	//createSpacesActivities(host, user, password)
-	//createSpacesActivitiy(host, 1, "<script language=\"javascript\">alert(\"test\")</script>test")
-
+	createSpaces(host, user, password)
+	addUsersToSpaces(host)
 }
