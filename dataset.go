@@ -159,8 +159,15 @@ func addUsersToSpaces(h string) {
 	t0 := time.Now()
 
 	var wg sync.WaitGroup
-	// Updating spaces is not thread safe
+	// Updating a space is not thread safe
+	// directing same space update to the same channel to avoid
+	// concurrency
 	var channels []chan *SpaceMembership
+	channels = append(channels, make(chan *SpaceMembership))
+	channels = append(channels, make(chan *SpaceMembership))
+	channels = append(channels, make(chan *SpaceMembership))
+	channels = append(channels, make(chan *SpaceMembership))
+	channels = append(channels, make(chan *SpaceMembership))
 	channels = append(channels, make(chan *SpaceMembership))
 	channels = append(channels, make(chan *SpaceMembership))
 	channels = append(channels, make(chan *SpaceMembership))
@@ -171,8 +178,8 @@ func addUsersToSpaces(h string) {
 		go function(&wg, c)
 	}
 
-	for sid := 0; sid < NB_SPACES; sid++ {
-		for u := 0; u < NB_USERS; u++ {
+	for u := 0; u < NB_USERS; u++ {
+		for sid := 0; sid < NB_SPACES; sid++ {
 			u := fmt.Sprintf("%s%d", USER_PREFIX, u)
 			s := fmt.Sprintf("%s%d", SPACE_PREFIX, sid)
 			m := SpaceMembership{User: u, Space: s}
