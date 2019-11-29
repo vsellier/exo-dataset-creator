@@ -4,6 +4,10 @@ Basic go script to init an  dataset of users and spaces in an exo platform insta
 
 Create some users and spaces
 
+```
+go run dataset.go <url> <user> <password>
+```
+
 TODO:
   - create spaces for several users
   - create activities
