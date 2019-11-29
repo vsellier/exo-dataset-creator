@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
-	"math/rand"
 	"sync"
 	"time"
 )
@@ -47,13 +47,13 @@ const (
 	SPACES_URI            = "/rest/private/v1/social/spaces"
 	SPACE_ACTIVITIES_URI  = "%s/rest/private/v1/social/spaces/%d/activities"
 	SPACE_MEMBERSHIP_URL  = "%s/rest/private/v1/social/spacesMemberships"
-	USER_PREFIX           = "test"
-	USER_PASSWORD         = "test123"
+	USER_PREFIX           = "abcde"
+	USER_PASSWORD         = "testtest123"
 	USER_EMAIL            = "@test.com"
-	SPACE_PREFIX          = "space"
-	NB_USERS              = 100
-	NB_SPACES             = 2000
-	NB_SPACES_ACTIVITIES  = 10
+	SPACE_PREFIX          = "spacetestestc"
+	NB_USERS              = 200
+	NB_SPACES             = 100
+	NB_SPACES_ACTIVITIES  = 1000
 	SPACE_ACTIVITY_LENGTH = 200
 )
 
@@ -110,6 +110,10 @@ func createUsers(h string) {
 	go createUser(&wg, c, h)
 	go createUser(&wg, c, h)
 	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
+	go createUser(&wg, c, h)
 
 	t0 := time.Now()
 
@@ -151,7 +155,6 @@ func addUsersToSpaces(h string) {
 			m := <-c
 
 			addUserToSpace(h, m.Space, m.User)
-
 			wg.Done()
 		}
 	}
@@ -262,31 +265,33 @@ func createSpacesActivities(h string, u string, p string) {
 	t0 := time.Now()
 
 	for i := 1; i <= NB_SPACES_ACTIVITIES; i++ {
-		for s := 1; s <= NB_SPACES; s++ {
-			ta0 := time.Now()
-			title := RandStringBytes(SPACE_ACTIVITY_LENGTH)
+		// for s := 1; s <= NB_SPACES; s++ {
+		s := 323
+		ta0 := time.Now()
+		title := RandStringBytes(SPACE_ACTIVITY_LENGTH)
+		// title = "test"
 
-			a := Activity{Title: title}
+		a := Activity{Title: title}
 
-			fmt.Print(fmt.Sprintf("Creating activity spaceId=%d actitivyCount=%d ...", s, i))
+		fmt.Print(fmt.Sprintf("Creating activity spaceId=%d actitivyCount=%d ...", s, i))
 
-			json, _ := json.Marshal(a)
+		json, _ := json.Marshal(a)
 
-			req, _ := http.NewRequest("POST", fmt.Sprintf(SPACE_ACTIVITIES_URI, h, s), bytes.NewBuffer(json))
+		req, _ := http.NewRequest("POST", fmt.Sprintf(SPACE_ACTIVITIES_URI, h, s), bytes.NewBuffer(json))
 
-			req.Close = true
-			req.Header.Set("Content-Type", "application/json")
+		req.Close = true
+		req.Header.Set("Content-Type", "application/json")
 
-			res, _ := client.Do(req)
-			fmt.Print(res.Status)
+		res, _ := client.Do(req)
+		fmt.Print(res.Status)
 
-			req.Body.Close()
-			res.Body.Close()
+		req.Body.Close()
+		res.Body.Close()
 
-			ta1 := time.Now()
-			fmt.Println(" in ", ta1.Sub(ta0))
+		ta1 := time.Now()
+		fmt.Println(" in ", ta1.Sub(ta0))
 
-		}
+		// }
 	}
 	t1 := time.Now()
 	fmt.Println("Activities created in ", t1.Sub(t0))
@@ -355,9 +360,9 @@ func main() {
 	getSession(host, user, password)
 
 	createUsers(host)
-	//createSpaces(host, user, password)
+	createSpaces(host, user, password)
 	addUsersToSpaces(host)
-	//createSpacesActivities(host, user, password)
-	//createSpacesActivitiy(host, 1, "<script language=\"javascript\">alert(\"test\")</script>test")
+	createSpacesActivities(host, user, password)
+	createSpacesActivitiy(host, 66, "fake identity to test")
 
 }
